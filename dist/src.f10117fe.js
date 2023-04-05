@@ -117,36 +117,77 @@ parcelRequire = (function (modules, cache, entry, globalName) {
   }
 
   return newRequire;
-})({"src/models/Eventing.ts":[function(require,module,exports) {
+})({"src/models/Model.ts":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.Eventing = void 0;
-var Eventing = /** @class */function () {
-  function Eventing() {
-    this.events = {}; // when we don't know what properties this object is going to have 
+exports.Model = void 0;
+var Model = /** @class */function () {
+  function Model(attributes, events, sync) {
+    this.attributes = attributes;
+    this.events = events;
+    this.sync = sync;
+    this.on = this.events.on;
+    this.trigger = this.events.trigger;
+    this.get = this.attributes.get;
   }
-
-  Eventing.prototype.on = function (eventName, callback) {
-    var handlers = this.events[eventName] || []; //when we first create our user and we look at this dot events and look up event name 
-    //that's going to give us undefined, then we'll fall back to assigning an empty array to handlers
-    handlers.push(callback);
-    this.events[eventName] = handlers;
+  Model.prototype.set = function (update) {
+    this.attributes.set(update);
+    this.events.trigger('change');
   };
-  Eventing.prototype.trigger = function (eventName) {
-    var handlers = this.events[eventName];
-    if (!handlers || handlers.length === 0) {
-      return;
+  Model.prototype.fetch = function () {
+    var _this = this;
+    var id = this.get('id');
+    if (typeof id !== 'number') {
+      //if user doesn't have id
+      throw new Error('Cannot fetch without an id');
     }
-    handlers.forEach(function (callback) {
-      callback();
+    this.sync.fetch(id).then(function (response) {
+      _this.set(response.data);
     });
   };
-  return Eventing;
+  Model.prototype.save = function () {
+    var _this = this;
+    this.sync.save(this.attributes.getAll()).then(function (response) {
+      _this.trigger('save');
+    }).catch(function () {
+      _this.trigger('error');
+    });
+  };
+  return Model;
 }();
-exports.Eventing = Eventing;
+exports.Model = Model;
+},{}],"src/models/Attributes.ts":[function(require,module,exports) {
+"use strict";
+
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.Attributes = void 0;
+var Attributes = /** @class */function () {
+  function Attributes(data) {
+    var _this = this;
+    this.data = data;
+    this.get = function (key) {
+      //K extends keyof T => sets up a generic constraint; we are limiting the different types that K can be
+      //(key: K) => argument; whatever argument we're passing in is going to be of type K
+      //T[K] => return type annotation
+      return _this.data[key];
+    };
+  }
+  Attributes.prototype.set = function (update) {
+    Object.assign(this.data, update); //take all the properties on update and the values 
+    //and copy/paste them over into this data and override all the properties on this data
+  };
+
+  Attributes.prototype.getAll = function () {
+    return this.data;
+  };
+  return Attributes;
+}();
+exports.Attributes = Attributes;
 },{}],"node_modules/axios/lib/helpers/bind.js":[function(require,module,exports) {
 'use strict';
 
@@ -5437,7 +5478,7 @@ exports.isCancel = isCancel;
 exports.CanceledError = CanceledError;
 exports.AxiosError = AxiosError;
 exports.Axios = Axios;
-},{"./lib/axios.js":"node_modules/axios/lib/axios.js"}],"src/models/Sync.ts":[function(require,module,exports) {
+},{"./lib/axios.js":"node_modules/axios/lib/axios.js"}],"src/models/ApiSync.ts":[function(require,module,exports) {
 "use strict";
 
 var __importDefault = this && this.__importDefault || function (mod) {
@@ -5448,16 +5489,16 @@ var __importDefault = this && this.__importDefault || function (mod) {
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.Sync = void 0;
+exports.ApiSync = void 0;
 var axios_1 = __importDefault(require("axios"));
-var Sync = /** @class */function () {
-  function Sync(rootUrl) {
+var ApiSync = /** @class */function () {
+  function ApiSync(rootUrl) {
     this.rootUrl = rootUrl;
   }
-  Sync.prototype.fetch = function (id) {
+  ApiSync.prototype.fetch = function (id) {
     return axios_1.default.get("".concat(this.rootUrl, "/").concat(id));
   };
-  Sync.prototype.save = function (data) {
+  ApiSync.prototype.save = function (data) {
     var id = data.id;
     if (id) {
       return axios_1.default.put("".concat(this.rootUrl, "/").concat(id), data);
@@ -5465,51 +5506,110 @@ var Sync = /** @class */function () {
       return axios_1.default.post(this.rootUrl, data);
     }
   };
-  return Sync;
+  return ApiSync;
 }();
-exports.Sync = Sync;
-},{"axios":"node_modules/axios/index.js"}],"src/models/User.ts":[function(require,module,exports) {
+exports.ApiSync = ApiSync;
+},{"axios":"node_modules/axios/index.js"}],"src/models/Eventing.ts":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
-exports.User = void 0;
-var Eventing_1 = require("./Eventing");
-var Sync_1 = require("./Sync");
-var rootUrl = 'http://localhost:3000/users';
-var User = /** @class */function () {
-  function User(data) {
-    this.data = data;
-    this.events = new Eventing_1.Eventing();
-    this.sync = new Sync_1.Sync(rootUrl);
+exports.Eventing = void 0;
+var Eventing = /** @class */function () {
+  function Eventing() {
+    var _this = this;
+    this.events = {}; // when we don't know what properties this object is going to have 
+    this.on = function (eventName, callback) {
+      var handlers = _this.events[eventName] || []; //when we first create our user and we look at this dot events and look up event name 
+      //that's going to give us undefined, then we'll fall back to assigning an empty array to handlers
+      handlers.push(callback);
+      _this.events[eventName] = handlers;
+    };
+    this.trigger = function (eventName) {
+      var handlers = _this.events[eventName];
+      if (!handlers || handlers.length === 0) {
+        return;
+      }
+      handlers.forEach(function (callback) {
+        callback();
+      });
+    };
   }
-  User.prototype.get = function (propName) {
-    return this.data[propName];
-  };
-  User.prototype.set = function (update) {
-    Object.assign(this.data, update); //take all the properties on update and the values 
-    //and copy/paste them over into this data and override all the properties on this data
-  };
-
-  return User;
+  return Eventing;
 }();
+exports.Eventing = Eventing;
+},{}],"src/models/User.ts":[function(require,module,exports) {
+"use strict";
+
+var __extends = this && this.__extends || function () {
+  var _extendStatics = function extendStatics(d, b) {
+    _extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+    };
+    return _extendStatics(d, b);
+  };
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+    _extendStatics(d, b);
+    function __() {
+      this.constructor = d;
+    }
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+Object.defineProperty(exports, "__esModule", {
+  value: true
+});
+exports.User = void 0;
+var Model_1 = require("./Model");
+var Attributes_1 = require("./Attributes");
+var ApiSync_1 = require("./ApiSync");
+var Eventing_1 = require("./Eventing");
+var rootUrl = 'http://localhost:3000/users';
+var User = /** @class */function (_super) {
+  __extends(User, _super);
+  function User() {
+    return _super !== null && _super.apply(this, arguments) || this;
+  }
+  User.buildUser = function (attrs) {
+    return new User(new Attributes_1.Attributes(attrs), new Eventing_1.Eventing(), new ApiSync_1.ApiSync(rootUrl));
+  };
+  return User;
+}(Model_1.Model);
 exports.User = User;
-},{"./Eventing":"src/models/Eventing.ts","./Sync":"src/models/Sync.ts"}],"src/index.ts":[function(require,module,exports) {
+},{"./Model":"src/models/Model.ts","./Attributes":"src/models/Attributes.ts","./ApiSync":"src/models/ApiSync.ts","./Eventing":"src/models/Eventing.ts"}],"src/index.ts":[function(require,module,exports) {
 "use strict";
 
 Object.defineProperty(exports, "__esModule", {
   value: true
 });
 var User_1 = require("./models/User");
-var user = new User_1.User({
-  name: 'new record',
-  age: 0
+var user = User_1.User.buildUser({
+  id: 1
 });
-user.events.on('change', function () {
-  console.log('change');
+user.on('change', function () {
+  console.log(user);
 });
-user.events.trigger('change');
+user.fetch();
+//user.set({ name: 'New Name'})
+//on is on function from the eventing class, we are getting back a reference to the method on the eventing class
+/* user.on('change', () => { //the parentheses invoke function this.events.on
+  console.log('user was changed')
+}) */
+//reminder on how 'this' works in JS
+// const colors = {
+//   color: 'red',
+//   printColor() {
+//     console.log(this.color) //this is equal to whatever is to the left of our function call printColor()
+//   }
+// }
+// const printColor = colors.printColor;
+// printColor() //there is nothing in left => undefined
 },{"./models/User":"src/models/User.ts"}],"C:/Users/jmjma/AppData/Roaming/npm/node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
@@ -5535,7 +5635,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "58570" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "49168" + '/');
   ws.onmessage = function (event) {
     checkedAssets = {};
     assetsToAccept = [];

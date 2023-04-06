@@ -1,4 +1,12 @@
-import { User } from "./models/User";
+import { UserForm } from "./views/UserForm";
+
+const userForm = new UserForm(
+  document.getElementById('root')
+)
+
+userForm.render();
+
+/* import { User } from "./models/User";
 
 const collection = User.buildUserCollection()
 
@@ -6,7 +14,7 @@ collection.on('change', () => {
   console.log(collection)
 })
 
-collection.fetch()
+collection.fetch() */
 
 /* import { User } from "./models/User";
 

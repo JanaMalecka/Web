@@ -1,50 +1,51 @@
-export class UserForm {
-  constructor(public parent: Element) {}
+import { User, UserProps } from '../models/User';
+import { View } from './View';
 
-  eventsMap():{ [key: string]: () => void } {
+export class UserForm extends View<User, UserProps> {
+    eventsMap():{ [key: string]: () => void } {
     return {
-      'click:button': this.onButtonClick, //we want to set up a click event handler to the button inside of our template
+       //we want to set up a click event handler to the button inside of our template
       'mouseenter:h1': this.onHeaderHover,
+      'click:.set-age': this.onSetAgeClick,
+      'click:.set-name': this.onSetNameClick,
+      'click:.save-model': this.onSaveClick
     }
   }
+
+  onSaveClick = (): void => {
+    this.model.save()
+  }
+
+  onSetNameClick = (): void => {
+    const input = this.parent.querySelector('input');
+
+    if (input) { // type guard - if element,then...if null - nothing
+      const name = input.value
+
+      this.model.set({ name})
+    }
+  }
+
+  onSetAgeClick = (): void => {
+    this.model.setRandomAge()
+  }
+  /* onSetAgeClick(): void {
+    this.model.setRandomAge() //error: cannot read properties of undefined
+  } */
 
   onHeaderHover(): void {
     console.log('hovered')
   }
 
-  onButtonClick(): void {
-    console.log('Hi there')
-  }
-
   template(): string {
     return `
       <div>
-        <h1>User form</h1>
-        <input />
-        <button>Click me</button>
+        <input placeholder="${this.model.get('name')}"/>
+        <button class="set-name">Change name</button>
+        <button class="set-age">Set random age</button>
+        <button class="save-model">Save user </button>
       </div>
     `
-  }
-
-  bindEvents(fragment: DocumentFragment): void {
-    const eventsMap = this.eventsMap();
-
-    for (let eventKey in eventsMap) {
-      const [eventName, selector] = eventKey.split(':') //S2015 syntax; 
-                  //when we call the event Key, we're going to expect to get back an array with 2 elements inside of it
-      fragment.querySelectorAll(selector).forEach(element => {
-        element.addEventListener(eventName, eventsMap[eventKey])
-      }) 
-    }
-  }
-
-  render(): void {
-    const templateElement = document.createElement('template');
-    templateElement.innerHTML = this.template();
-
-    this.bindEvents(templateElement.content)
-
-    this.parent.append(templateElement.content); //reference to a DocumentFragment
   }
 }
 

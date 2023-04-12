@@ -1,3 +1,3 @@
 # Web
-Web app build in TS
+Web app build in TS,
 backbonejs + marionettejs used

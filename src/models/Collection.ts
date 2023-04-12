@@ -1,7 +1,7 @@
 import axios, {AxiosResponse} from "axios";
 import { Eventing } from "./Eventing";
 
-export class Collection<T, K> { //type pf json data
+export class Collection<T, K> { //type of json data
   models: T[] = [];
   events: Eventing = new Eventing();
 
